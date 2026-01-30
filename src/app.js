@@ -23,7 +23,7 @@ app.use("/api/auth", require("./routes/auth.routes"));
 
 app.use("/api/plans", require("./routes/plan.routes"));
 
-// app.use("/api", require("./routes/web.routes"));
+app.use("/api", require("./routes/web.routes"));
 
 
 app.get('/', (req, res) => {

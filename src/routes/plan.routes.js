@@ -17,6 +17,16 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Get user subscriptions
+router.get("/subscriptions", auth, async (req, res) => {
+  try {
+    const subscriptions = await Subscription.find({ user: req.user.id }).populate('plan').sort({ createdAt: -1 });
+    res.json({ success: true, data: subscriptions });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
 // Subscribe to a plan (clients only)
 router.post("/subscribe", auth, allowRoles("client"), validate(subscribeSchema), async (req, res) => {
   try {
