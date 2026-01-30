@@ -21,6 +21,8 @@ app.use(
 
 app.use("/api/auth", require("./routes/auth.routes"));
 
+app.use("/api", require("./routes/web.routes"));
+
 
 app.get('/', (req, res) => {
     res.status(200).send({
