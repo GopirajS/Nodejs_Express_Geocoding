@@ -17,3 +17,7 @@ exports.subscribeSchema = Joi.object({
   }),
   start_date: Joi.date().iso().required(),
 });
+
+exports.weatherSchema = Joi.object({
+  location: Joi.string().min(2).max(100).required(),
+});

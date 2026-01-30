@@ -13,7 +13,9 @@ router.get("/", async (req, res) => {
     const plans = await Plan.find();
     res.json({ success: true, data: plans });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("Subscriptions API error:", error);
+    const message = error.message || "Server error";
+    res.status(500).json({ success: false, message, status: false });
   }
 });
 
@@ -23,7 +25,9 @@ router.get("/subscriptions", auth, async (req, res) => {
     const subscriptions = await Subscription.find({ user: req.user.id }).populate('plan').sort({ createdAt: -1 });
     res.json({ success: true, data: subscriptions });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("Plans API error:", error);
+    const message = error.message || "Server error";
+    res.status(500).json({ success: false, message, status: false });
   }
 });
 
@@ -64,7 +68,9 @@ router.post("/subscribe", auth, allowRoles("client"), validate(subscribeSchema),
 
     res.json({ success: true, message: "Subscription created successfully", data: subscription });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Subscribe API error:", error);
+    const message = error.message || "Server error";
+    res.status(500).json({ success: false, message, status: false });
   }
 });
 
