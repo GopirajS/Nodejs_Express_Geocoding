@@ -21,6 +21,8 @@ app.use(
 
 app.use("/api/auth", require("./routes/auth.routes"));
 
+app.use("/api/plans", require("./routes/plan.routes"));
+
 app.use("/api", require("./routes/web.routes"));
 
 
@@ -32,7 +34,6 @@ app.get('/', (req, res) => {
         }
     });
 });
-
 
 app.use((err, req, res, next) => {
     res.status(err.statusCode || 500).send({
