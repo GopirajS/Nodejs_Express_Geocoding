@@ -11,7 +11,6 @@ app.use(cookieParser());
 app.use(express.urlencoded({ extended: false }));
 
 app.use(morgan('dev'));
-app.use(morgan('combined', { stream: httpLogStream }));
 
 app.use(
   cors({
