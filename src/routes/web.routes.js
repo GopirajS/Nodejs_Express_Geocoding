@@ -26,6 +26,24 @@ router.get("/users", require("../middlewares/auth.middleware"), async (req, res)
   }
 });
 
+// Get usage logs for a user
+router.get("/usage-logs/:user_id", auth, async (req, res) => {
+  try {
+    const { user_id } = req.params;
+    // Allow users to see their own logs, or admins to see any
+    if (req.user.role !== "admin" && req.user.id !== user_id) {
+      return res.status(403).json({ success: false, message: "Access denied", status: false });
+    }
+
+    const logs = await UsageLog.find({ user: user_id }).populate('subscription').sort({ createdAt: -1 });
+    res.json({ success: true, data: logs });
+  } catch (error) {
+    console.error("Usage logs API error:", error);
+    const message = error.message || "Server error";
+    res.status(500).json({ success: false, message, status: false });
+  }
+});
+
 // Weather search API
 router.post("/weather", auth, allowRoles("client"), validate(weatherSchema), async (req, res) => {
   try {
