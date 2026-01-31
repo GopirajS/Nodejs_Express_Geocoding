@@ -22,7 +22,9 @@ router.get("/", async (req, res) => {
 // Get user subscriptions
 router.get("/subscriptions", auth, async (req, res) => {
   try {
-    const subscriptions = await Subscription.find({ user: req.user.id }).populate('plan').sort({ createdAt: -1 });
+    // If admin, show all subscriptions; if client, show only their own
+    const filter = req.user.role === 'admin' ? {} : { user: req.user.id };
+    const subscriptions = await Subscription.find(filter).populate('plan user', 'name email').sort({ createdAt: -1 });
     res.json({ success: true, data: subscriptions });
   } catch (error) {
     console.error("Plans API error:", error);
@@ -31,8 +33,26 @@ router.get("/subscriptions", auth, async (req, res) => {
   }
 });
 
+// Admin: Get all subscriptions with user details
+router.get("/admin/subscriptions", auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: "Access denied. Admin only." });
+    }
+    const subscriptions = await Subscription.find()
+      .populate('plan', 'name price units')
+      .populate('user', 'name email role')
+      .sort({ createdAt: -1 });
+    res.json({ success: true, data: subscriptions });
+  } catch (error) {
+    console.error("Admin subscriptions API error:", error);
+    const message = error.message || "Server error";
+    res.status(500).json({ success: false, message, status: false });
+  }
+});
+
 // Subscribe to a plan (clients only)
-router.post("/subscribe", auth, allowRoles("client"), validate(subscribeSchema), async (req, res) => {
+router.post("/subscribe", auth, validate(subscribeSchema), async (req, res) => {
   try {
     const { plan_id, start_date } = req.body;
     const user_id = req.user.id;

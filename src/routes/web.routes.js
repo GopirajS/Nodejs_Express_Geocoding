@@ -7,13 +7,30 @@ const { allowRoles } = require("../middlewares/role.middleware");
 const validate = require("../middlewares/validate.middleware");
 const { weatherSchema } = require("../validations/payload.validation");
 const User = require("../models/user.model");
+const Plan = require("../models/plan.model");
 const Subscription = require("../models/subscription.model");
 const UsageLog = require("../models/usageLog.model");
 
-router.get("/dashboard", auth, (req, res) => {
-    // debug(req.user);
-    const message = req.user.role === "client" ? "Welcome client" : "Welcome Admin";
-    res.json({ message });
+// Dashboard Stats API
+router.get("/dashboard", auth, async (req, res) => {
+    try {
+        const [usersCount, plansCount, subscriptionsCount] = await Promise.all([
+            User.countDocuments(),
+            Plan.countDocuments(),
+            Subscription.countDocuments()
+        ]);
+
+        res.json({
+            success: true,
+            data: {
+                users: usersCount,
+                plans: plansCount,
+                subscriptions: subscriptionsCount
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Server error" });
+    }
 });
 
 

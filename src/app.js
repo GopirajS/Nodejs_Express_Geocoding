@@ -12,10 +12,14 @@ app.use(express.urlencoded({ extended: false }));
 
 app.use(morgan('dev'));
 
+app.options('*', cors());
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
+    origin: '*',
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
   })
 );
 

@@ -39,7 +39,7 @@ exports.login = async (req, res) => {
     return res.status(400).json({ message: "Invalid credentials" });
   }
 
-  const token = generateToken({ id: user._id,role: user.role });
+  const token = generateToken({ id: user._id, role: user.role });
 
   res.cookie("token", token, {
     httpOnly: true,
@@ -48,8 +48,10 @@ exports.login = async (req, res) => {
     maxAge: 24 * 60 * 60 * 1000,
   });
 
+  
   res.json({
     message: "Login successful",
-    user: { id: user._id, email: user.email },
+    user: { id: user._id, email: user.email, role: user.role ,token: token},
   });
+  
 };
