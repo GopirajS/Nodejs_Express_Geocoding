@@ -9,6 +9,7 @@ const usageLogSchema = new mongoose.Schema(
     response_data: { type: Object, required: true },
     credits_count: { type: [String, Number], required: true },
     used_credit: { type: Number, required: true },
+    remaining_credits: { type: [String, Number], required: true },
     units_used: { type: Number, required: true },
   },
   { timestamps: true }

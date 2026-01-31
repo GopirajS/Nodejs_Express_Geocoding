@@ -34,6 +34,7 @@ router.get("/dashboard", auth, async (req, res) => {
 });
 
 
+
 router.get("/users", require("../middlewares/auth.middleware"), async (req, res) => {
     try {
         const users = await User.find().select("-password").sort({ createdAt: -1 });
@@ -43,17 +44,25 @@ router.get("/users", require("../middlewares/auth.middleware"), async (req, res)
     }
 });
 
-// Get usage logs for a user
-router.get("/usage-logs/:user_id", auth, async (req, res) => {
+// Get usage logs by subscription ID
+router.get("/usage-logs/:sub_id", auth, async (req, res) => {
     try {
-        const { user_id } = req.params;
-        // Allow users to see their own logs, or admins to see any
-        if (req.user.role !== "admin" && req.user.id !== user_id) {
-            return res.status(403).json({ success: false, message: "Access denied", status: false });
+        const { sub_id } = req.params;
+        
+        // For clients, verify the subscription belongs to them
+        if (req.user.role !== 'admin') {
+            const subscription = await Subscription.findOne({ _id: sub_id, user: req.user.id });
+            if (!subscription) {
+                return res.status(403).json({ success: false, message: "Access denied", status: false });
+            }
         }
 
-        const logs = await UsageLog.find({ user: user_id }).populate('subscription').sort({ createdAt: -1 });
+        const logs = await UsageLog.find({ subscription: sub_id })
+            .sort({ createdAt: -1 });
+
+
         res.json({ success: true, data: logs });
+
     } catch (error) {
         console.error("Usage logs API error:", error);
         const message = error.message || "Server error";
@@ -81,12 +90,17 @@ router.post("/geocoding", auth, allowRoles("client"), validate(weatherSchema), a
 
         const credits_count = availableUnits === Infinity ? "Unlimited" : availableUnits;
         const used_credit = subscription.units_used + 1;
+        const remaining_credits = availableUnits === Infinity ? "Unlimited" : availableUnits - subscription.units_used;
 
         // Call external weather API
         console.log(`Calling Open-Meteo API for location: ${location}`);
 
-        const weatherResponse = await axios.get(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1`, {
-            timeout: 100000, // 10 second timeout
+        let url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1`;
+
+
+        debug(url);
+        const weatherResponse = await axios.get(url, {
+            timeout: 1000000, // 10 second timeout
             headers: {
                 'Accept': 'application/json'
             }
@@ -115,7 +129,8 @@ router.post("/geocoding", auth, allowRoles("client"), validate(weatherSchema), a
             response_data: weatherData,
             credits_count,
             used_credit,
-            units_used: used_credit,
+            remaining_credits,
+            units_used: subscription.units_used,
         });
         await log.save();
 
@@ -123,7 +138,8 @@ router.post("/geocoding", auth, allowRoles("client"), validate(weatherSchema), a
             success: true,
             data: weatherData,
             credits_count,
-            used_credit
+            used_credit,
+            remaining_credits
         });
     } catch (error) {
 
