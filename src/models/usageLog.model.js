@@ -7,6 +7,8 @@ const usageLogSchema = new mongoose.Schema(
     location: { type: String, required: true },
     request_payload: { type: Object, required: true },
     response_data: { type: Object, required: true },
+    credits_count: { type: [String, Number], required: true },
+    used_credit: { type: Number, required: true },
     units_used: { type: Number, required: true },
   },
   { timestamps: true }

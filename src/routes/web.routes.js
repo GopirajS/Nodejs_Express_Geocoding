@@ -11,80 +11,120 @@ const Subscription = require("../models/subscription.model");
 const UsageLog = require("../models/usageLog.model");
 
 router.get("/dashboard", auth, (req, res) => {
-  // debug(req.user);
-  const message = req.user.role === "client" ? "Welcome client" : "Welcome Admin";
-  res.json({ message });
+    // debug(req.user);
+    const message = req.user.role === "client" ? "Welcome client" : "Welcome Admin";
+    res.json({ message });
 });
 
 
 router.get("/users", require("../middlewares/auth.middleware"), async (req, res) => {
-  try {
-    const users = await User.find().select("-password").sort({ createdAt: -1 });
-    res.json({ success: true, data: users });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Server error" });
-  }
+    try {
+        const users = await User.find().select("-password").sort({ createdAt: -1 });
+        res.json({ success: true, data: users });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Server error" });
+    }
 });
 
 // Get usage logs for a user
 router.get("/usage-logs/:user_id", auth, async (req, res) => {
-  try {
-    const { user_id } = req.params;
-    // Allow users to see their own logs, or admins to see any
-    if (req.user.role !== "admin" && req.user.id !== user_id) {
-      return res.status(403).json({ success: false, message: "Access denied", status: false });
-    }
+    try {
+        const { user_id } = req.params;
+        // Allow users to see their own logs, or admins to see any
+        if (req.user.role !== "admin" && req.user.id !== user_id) {
+            return res.status(403).json({ success: false, message: "Access denied", status: false });
+        }
 
-    const logs = await UsageLog.find({ user: user_id }).populate('subscription').sort({ createdAt: -1 });
-    res.json({ success: true, data: logs });
-  } catch (error) {
-    console.error("Usage logs API error:", error);
-    const message = error.message || "Server error";
-    res.status(500).json({ success: false, message, status: false });
-  }
+        const logs = await UsageLog.find({ user: user_id }).populate('subscription').sort({ createdAt: -1 });
+        res.json({ success: true, data: logs });
+    } catch (error) {
+        console.error("Usage logs API error:", error);
+        const message = error.message || "Server error";
+        res.status(500).json({ success: false, message, status: false });
+    }
 });
 
 // Weather search API
-router.post("/weather", auth, allowRoles("client"), validate(weatherSchema), async (req, res) => {
-  try {
-    const { location } = req.body;
-    const user_id = req.user.id;
+router.post("/geocoding", auth, allowRoles("client"), validate(weatherSchema), async (req, res) => {
+    try {
+        const { location } = req.body;
+        const user_id = req.user.id;
 
-    // Find active subscription
-    const subscription = await Subscription.findOne({ user: user_id, status: "active" });
-    if (!subscription) {
-      return res.status(403).json({ success: false, message: "No active subscription found" });
+        // Find active subscription
+        const subscription = await Subscription.findOne({ user: user_id, status: "active" });
+        if (!subscription) {
+            return res.status(403).json({ success: false, message: "No active subscription found. Pls subscripe any one plan" });
+        }
+
+        // Check if units are available
+        const availableUnits = subscription.plan_units === "Unlimited" ? Infinity : parseInt(subscription.plan_units.replace(/,/g, '')) || 0;
+        if (subscription.units_used >= availableUnits) {
+            return res.status(403).json({ success: false, message: "No units available in your plan.pls subscripe the any one plan" });
+        }
+
+        const credits_count = availableUnits === Infinity ? "Unlimited" : availableUnits;
+        const used_credit = subscription.units_used + 1;
+
+        // Call external weather API
+        console.log(`Calling Open-Meteo API for location: ${location}`);
+
+        const weatherResponse = await axios.get(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1`, {
+            timeout: 100000, // 10 second timeout
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+
+        const weatherData = weatherResponse.data;
+
+        // Check if we got valid data
+        if (!weatherData || !weatherData.results) {
+            return res.status(404).json({
+                success: false,
+                message: "No results found for this location"
+            });
+        }
+
+        // Update units used
+        subscription.units_used += 1;
+        await subscription.save();
+
+        // Log the request
+        const log = new UsageLog({
+            user: user_id,
+            subscription: subscription._id,
+            location,
+            request_payload: { location },
+            response_data: weatherData,
+            credits_count,
+            used_credit,
+            units_used: used_credit,
+        });
+        await log.save();
+
+        res.json({
+            success: true,
+            data: weatherData,
+            credits_count,
+            used_credit
+        });
+    } catch (error) {
+
+        if (error.code === 'ECONNREFUSED') {
+            return res.status(503).json({ success: false, message: "Unable to connect to weather service" });
+        }
+        if (error.response) {
+            return res.status(error.response.status).json({
+                success: false,
+                message: error.response.data?.message || "Weather API error"
+            });
+        }
+        if (error.request) {
+            return res.status(504).json({ success: false, message: "Weather service timeout" });
+        }
+
+        res.status(500).json({ success: false, message: error.message || "Internal server error" });
     }
-
-    // Check if units are available
-    const availableUnits = subscription.plan_units === "Unlimited" ? Infinity : parseInt(subscription.plan_units.replace(/,/g, '')) || 0;
-    if (subscription.units_used >= availableUnits) {
-      return res.status(403).json({ success: false, message: "No units available in your plan" });
-    }
-
-    // Call external weather API
-    const weatherResponse = await axios.get(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1`);
-    const weatherData = weatherResponse.data;
-
-    // Update units used
-    subscription.units_used += 1;
-    await subscription.save();
-
-    // Log the request
-    const log = new UsageLog({
-      user: user_id,
-      subscription: subscription._id,
-      location,
-      request_payload: { location },
-      response_data: weatherData,
-      units_used: subscription.units_used,
-    });
-    await log.save();
-
-    res.json({ success: true, data: weatherData });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
 });
 
 module.exports = router;
