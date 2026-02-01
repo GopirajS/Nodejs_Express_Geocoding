@@ -33,7 +33,7 @@ app.get('/', (req, res) => {
     res.status(200).send({
         status: "success",
         data: {
-            message: "API working fine"
+            message: "API working fine Gopi Raj"
         }
     });
 });
